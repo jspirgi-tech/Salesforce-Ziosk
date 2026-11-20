@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ziosk on Salesforce</title>
+<style>
+/* Layout: dark, at-the-table advisory brief. Receipt hero, quiet editorial sections, one dashed "optional" layer in the architecture. */
+:root{
+  --bg:#0B0C0F; --paper:#16181D; --ink:#F4F5F7; --muted:#A9AFBA; --rule:#2A2E36;
+  --accent:#FF6A2B; --accent-ink:#0B0C0F; --blue:#6DB4FA; --soft:#1D2027; --receipt:#F6F5F1; --receipt-ink:#14161A;
+  --display:'Avenir Next','Helvetica Neue','Segoe UI',Arial,sans-serif;
+  --body:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#F3F4F6; --paper:#FFFFFF; --ink:#0F1115; --muted:#566070; --rule:#D3D8E0;
+  --accent:#C2410C; --accent-ink:#FFFFFF; --blue:#0A5CB0; --soft:#E8EDF4; --receipt:#FFFFFF; --receipt-ink:#14161A; color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#F3F4F6; --paper:#FFFFFF; --ink:#0F1115; --muted:#566070; --rule:#D3D8E0;
+  --accent:#C2410C; --accent-ink:#FFFFFF; --blue:#0A5CB0; --soft:#E8EDF4; --receipt:#FFFFFF; --receipt-ink:#14161A; color-scheme:light}
+*{box-sizing:border-box}
+html,body{margin:0;overflow-x:clip}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1040px;margin:0 auto}
+h1,h2,h3,h4{font-family:var(--display);line-height:1.08;text-wrap:balance;margin:0}
+h2{font-size:clamp(30px,5vw,46px);font-weight:800;letter-spacing:-.02em}
+h3{font-size:22px;font-weight:700;letter-spacing:-.01em}
+p{margin:0}
+.label{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+a{color:var(--blue)}
+:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+section{padding-block:72px}
+.lede{max-width:64ch;color:var(--muted);font-size:19px;margin-top:18px}
+.full{margin-inline:calc(50% - 50vw);padding-inline:calc(50vw - 50%)}
+.hyp{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--accent);color:var(--accent);padding:2px 8px;margin-left:8px;vertical-align:middle}
+
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-block:20px;border-bottom:1px solid var(--rule)}
+.brand{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:.04em}
+.brand i{font-style:normal;color:var(--accent);margin-inline:6px}
+.brand span{font-weight:500;letter-spacing:0}
+
+.hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:48px;align-items:center;padding-block:64px 72px}
+.hero h1{font-size:clamp(36px,6vw,64px);font-weight:800;letter-spacing:-.03em}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .lede{font-size:20px}
+.receipt{background:var(--receipt);color:var(--receipt-ink);font-family:var(--mono);font-size:13.5px;padding:28px 26px 36px;
+  box-shadow:0 22px 50px -24px rgba(0,0,0,.7);transform:rotate(1.2deg);
+  -webkit-mask:radial-gradient(circle 7px at 7px 100%,#0000 98%,#000) 0 0/14px 100% repeat-x;mask:radial-gradient(circle 7px at 7px 100%,#0000 98%,#000) 0 0/14px 100% repeat-x}
+.receipt .c{text-align:center}
+.receipt hr{border:0;border-top:1px dashed #7a808a;margin:14px 0}
+.receipt .row{display:flex;justify-content:space-between;gap:12px;padding:2px 0}
+.receipt .row span:last-child{text-align:right}
+.receipt .tot{font-weight:500;font-size:14.5px}
+.receipt .tot span:last-child{color:#C2410C}
+
+.heard{background:var(--paper);border-block:1px solid var(--rule)}
+.quotes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin-top:40px;border-top:1px solid var(--rule)}
+.quote{padding:28px 32px 28px 0;border-bottom:1px solid var(--rule)}
+.quote:nth-child(even){padding:28px 0 28px 32px;border-left:1px solid var(--rule)}
+.quote blockquote{margin:0;font-family:var(--display);font-size:23px;font-weight:700;line-height:1.25;letter-spacing:-.01em}
+.quote p{margin-top:12px;color:var(--muted);font-size:15px}
+.note{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:18px}
+
+.imp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:48px;margin-top:40px}
+.ledger{border-top:2px solid var(--ink)}
+.ledger div{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--rule)}
+.ledger b{font-family:var(--display);font-weight:700}
+.ledger span.v{font-family:var(--mono);font-size:13.5px;color:var(--muted);text-align:right}
+.q{background:var(--soft);border-left:4px solid var(--accent);padding:24px 26px;margin-top:0}
+.q .label{color:var(--accent)}
+.q p{font-family:var(--display);font-size:24px;font-weight:700;line-height:1.2;margin-top:10px;letter-spacing:-.01em}
+.imp ul{margin:20px 0 0;padding:0;list-style:none;display:grid;gap:12px}
+.imp li{padding-left:22px;position:relative;font-size:16px}
+.imp li::before{content:"";position:absolute;left:0;top:.7em;width:10px;height:2px;background:var(--accent)}
+.imp li b{font-family:var(--display)}
+
+.opp{background:var(--paper);border-block:1px solid var(--rule)}
+.qgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:36px}
+.qcell{background:var(--bg);padding:22px 24px}
+.qcell .k{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.qcell p{margin-top:8px;font-size:16.5px}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-top:20px}
+.col{border-top:3px solid var(--rule);padding-top:16px}
+.col.sf{border-color:var(--accent)}
+.col.int{border-color:var(--blue)}
+.col h4{font-size:18px;font-weight:700;margin:6px 0 10px}
+.col ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.col li{font-size:15px;color:var(--muted)}
+.col li b{color:var(--ink);font-weight:600}
+.limit{border:1px solid var(--rule);padding:16px 20px;margin-top:24px;font-size:15.5px;color:var(--muted)}
+.limit b{color:var(--ink)}
+.sub{margin-top:64px}
+
+.bgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;margin-top:36px;align-items:start}
+.story{background:var(--bg);border:1px solid var(--rule);padding:26px}
+.story h4{font-size:20px;margin:10px 0 10px}
+.story p{font-size:15.5px;color:var(--muted)}
+.story p+p{margin-top:10px}
+.story .caveat{color:var(--ink);border-top:1px solid var(--rule);padding-top:12px;margin-top:14px;font-size:14.5px}
+.bgrid ul{margin:16px 0 0;padding:0;list-style:none;display:grid;gap:10px}
+.bgrid li{padding-left:22px;position:relative;font-size:16px}
+.bgrid li::before{content:"";position:absolute;left:0;top:.7em;width:10px;height:2px;background:var(--accent)}
+
+.stack{display:grid;gap:10px;margin-top:36px}
+.layer{display:grid;grid-template-columns:170px minmax(0,1fr);gap:20px;padding:18px 22px;background:var(--paper);border:1px solid var(--rule)}
+.layer .label{align-self:center}
+.layer .sm{display:block;margin-top:4px;font-size:12px;letter-spacing:0;text-transform:none;font-family:var(--body)}
+.layer.opt{background:transparent;border:2px dashed var(--accent)}
+.layer.opt .label{color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-size:14px;padding:4px 12px;border:1px solid var(--rule);border-radius:99px}
+.layer.keep .chip{border-color:var(--muted)}
+.layer.opt .chip{border-color:var(--accent);border-style:dashed}
+.legend{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:12px}
+.not{border-left:4px solid var(--rule);padding:6px 0 6px 20px;margin-top:40px;max-width:70ch;color:var(--muted);font-size:16px}
+.not b{color:var(--ink);font-family:var(--display)}
+
+.steps{margin-top:36px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:2px solid var(--ink)}
+.step{padding:20px 22px 8px 0}
+.step+.step{padding-left:22px;border-left:1px solid var(--rule)}
+.step .d{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.step h3{font-size:19px;margin:8px 0}
+.step p{font-size:15px;color:var(--muted)}
+.cta{background:var(--accent);color:var(--accent-ink);margin-top:56px;padding:40px 36px}
+.cta h2{color:var(--accent-ink)}
+.cta p.s{margin-top:16px;max-width:62ch;font-size:18px}
+.cta .btn{display:inline-block;margin-top:24px;font-family:var(--display);font-weight:800;font-size:20px;border-bottom:3px solid var(--accent-ink);padding-bottom:4px}
+.cta .coord{margin-top:20px;font-size:15px;max-width:62ch;opacity:.92}
+.people{display:flex;gap:28px;flex-wrap:wrap;margin-top:28px}
+.people div{flex:1 1 220px;min-width:0;border-top:1px solid var(--rule);padding-top:12px}
+.people b{font-family:var(--display);display:block;font-size:18px}
+.people span{font-size:14.5px;color:var(--muted)}
+
+details{margin-top:56px;border-top:1px solid var(--rule);padding-top:20px}
+summary{cursor:pointer;font-family:var(--mono);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink)}
+details ul{margin:16px 0 0;padding:0;list-style:none;display:grid;gap:12px;font-size:14.5px;color:var(--muted)}
+details li b{color:var(--ink);font-weight:600}
+footer{padding-block:28px 48px;font-size:13px;color:var(--muted)}
+footer p+p{margin-top:8px}
+
+@media (max-width:860px){
+  .hero,.imp,.bgrid{grid-template-columns:minmax(0,1fr);gap:32px}
+  .quotes,.qgrid,.cols{grid-template-columns:minmax(0,1fr)}
+  .quote,.quote:nth-child(even){padding:22px 0;border-left:0}
+  .steps{grid-template-columns:minmax(0,1fr)}
+  .step,.step+.step{padding:18px 0;border-left:0;border-bottom:1px solid var(--rule)}
+  .layer{grid-template-columns:minmax(0,1fr);gap:8px}
+  section{padding-block:52px}
+  .receipt{transform:none}
+  .cta{padding:30px 22px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top"><div class="brand">ZIOSK<i>×</i><span>Salesforce</span></div><span class="label">Prepared for Ziosk by Salesforce · Nov 2026</span></div>
+
+  <!-- 1 HERO -->
+  <div class="hero">
+    <div>
+      <p class="label">A point of view for Ziosk leadership</p>
+      <h1 style="margin-top:14px">Ziosk's next growth opportunity isn't just more restaurants. <em>It's the operational intelligence to serve them at scale.</em></h1>
+      <p class="lede">Two priorities came out of our conversation with Bryan Campbell: expanding into the mid-market through POS partners, and bringing more intention to how AI is adopted in 2027. They are the same question seen from two sides. This brief explores it, and respects the systems Ziosk has already chosen.</p>
+    </div>
+    <div class="receipt" role="img" aria-label="Receipt summarizing two priorities and the proposed next step">
+      <div class="c"><b>ZIOSK × SALESFORCE</b><br>Strategy brief<br>Table: Next phase of growth</div>
+      <hr>
+      <div class="row"><span>1 Mid-market growth</span><span>More restaurants</span></div>
+      <div class="row"><span>1 Governed AI</span><span>Approved, visible</span></div>
+      <hr>
+      <div class="row"><span>Systems replaced</span><span>0</span></div>
+      <div class="row"><span>HubSpot · Jira · M365</span><span>Stay</span></div>
+      <hr>
+      <div class="row tot"><span>STARTING POINT</span><span>A conversation</span></div>
+      <hr>
+      <div class="c">Thank you.<br>Pay when ready.</div>
+    </div>
+  </div>
+
+  <!-- 2 WHAT WE HEARD -->
+  <section class="heard full" aria-labelledby="h-heard">
+    <div class="wrap">
+      <p class="label">What we heard from Ziosk</p>
+      <h2 id="h-heard" style="margin-top:12px">In Bryan's words.</h2>
+      <div class="quotes">
+        <div class="quote"><blockquote>“It's definitely growth… principally through additional footprint. So that means more restaurants.”</blockquote><p>Growth is a footprint story.</p></div>
+        <div class="quote"><blockquote>“We've captured most of the large enterprise customers that are out there to capture… that means you have to go more mid-market.”</blockquote><p>Wins will no longer arrive “500 restaurants at a time.”</p></div>
+        <div class="quote"><blockquote>“Working with Toast is definitely… probably a magic key for that.”</blockquote><p>POS partners are the path to mid-market distribution.</p></div>
+        <div class="quote"><blockquote>“It's in fits and starts. It's in patchwork.”</blockquote><p>On AI adoption. For 2027: “how do you put a wrapper around all that,” including AI gateways and governance analysis.</p></div>
+      </div>
+      <p class="note">Quotes are from our Nov 20, 2026 call, lightly trimmed for readability. Bryan also described HubSpot (recommitted in May), Jira Service Management, and Microsoft 365 with Teams as established parts of Ziosk's environment. We take those as given.</p>
+    </div>
+  </section>
+
+  <!-- 3 IMPLICATIONS -->
+  <section aria-labelledby="h-imp">
+    <p class="label">The operational implications of mid-market growth</p>
+    <h2 id="h-imp" style="margin-top:12px">Growing the footprint changes the shape of the work.</h2>
+    <p class="lede">Enterprise growth arrives as a few large deployments. Mid-market growth could arrive as many smaller relationships. These are our hypotheses from one conversation, not findings about Ziosk's operations. We would like your leaders to test them.</p>
+    <div class="imp">
+      <div>
+        <div class="ledger" role="table" aria-label="Hypotheses about the shift from enterprise to mid-market">
+          <div role="row"><b>Customer relationships</b><span class="v">Few, large → many, smaller</span></div>
+          <div role="row"><b>Onboarding events</b><span class="v">Fewer → more frequent</span></div>
+          <div role="row"><b>POS partner coordination</b><span class="v">A handful → a wider channel</span></div>
+          <div role="row"><b>Deployment and integration</b><span class="v">Bespoke → needs repeatable</span></div>
+          <div role="row"><b>Aggregate support demand</b><span class="v">Possibly higher in total</span></div>
+          <div role="row"><b>Cost to serve</b><span class="v">More pressure to standardize</span></div>
+        </div>
+        <p class="note">Each row is a hypothesis to validate with Ziosk operations, not a confirmed problem.<span class="hyp">Hypotheses</span></p>
+      </div>
+      <div>
+        <div class="q"><span class="label">The central question</span><p>How does Ziosk grow its restaurant footprint without growing operational complexity and cost at the same rate?</p></div>
+        <ul>
+          <li><b>Governed AI</b> could keep new tools and workflows consistent as more teams adopt them.</li>
+          <li><b>AI-assisted restaurant support</b> could help operators resolve common issues faster, with complex incidents routed to the support workflow you already run.</li>
+          <li>Neither depends on changing Ziosk's CRM or ticketing platform.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 TWO OPPORTUNITIES -->
+  <section class="opp full" aria-labelledby="h-opp">
+    <div class="wrap">
+      <p class="label">Two strategic AI opportunities</p>
+      <h2 id="h-opp" style="margin-top:12px">From fragmented AI adoption to governed AI at scale.</h2>
+      <p class="lede"><b style="color:var(--ink)">Opportunity A.</b> Establish consistent standards for how AI is adopted, approved, permissioned, and monitored across Ziosk. This comes directly from what Bryan told us.</p>
+
+      <div class="qgrid">
+        <div class="qcell"><div class="k">Approve</div><p>How does Ziosk evaluate and approve AI tools across departments?</p></div>
+        <div class="qcell"><div class="k">Control</div><p>How are sensitive information, permissions, and model access controlled?</p></div>
+        <div class="qcell"><div class="k">Monitor</div><p>How does IT monitor usage, risk, cost, and effectiveness?</p></div>
+        <div class="qcell"><div class="k">Enable</div><p>How can Ziosk enable useful AI workflows without creating disconnected systems?</p></div>
+      </div>
+
+      <h3 class="sub" style="font-size:26px">Where Salesforce could contribute, and where it can't.</h3>
+      <div class="cols">
+        <div class="col sf">
+          <span class="label">Salesforce capability</span>
+          <h4>For AI that runs in Salesforce</h4>
+          <ul>
+            <li><b>Einstein Trust Layer.</b> Built-in controls on how prompts and data reach a model, such as data masking and audit logging. Coverage varies by feature.</li>
+            <li><b>Governance and observability for Agentforce agents.</b> Designed in, for agents built on Salesforce.</li>
+            <li><b>Claude inside Salesforce's trust boundary.</b> Anthropic's models, hosted via Amazon Bedrock, are offered inside Agentforce to select customers.</li>
+          </ul>
+        </div>
+        <div class="col int">
+          <span class="label">Needs integration or configuration</span>
+          <h4>Across more of Ziosk's stack</h4>
+          <ul>
+            <li><b>MuleSoft Agent Fabric.</b> A separate product described as a control plane to discover, govern, orchestrate, and observe agents, APIs, and MCP servers. Orchestration covers agents that support the A2A standard. Fit with Ziosk's environment would need technical validation.</li>
+            <li><b>Connections to Jira and Microsoft 365.</b> Would be scoped and built, not assumed.</li>
+          </ul>
+        </div>
+        <div class="col">
+          <span class="label">Ziosk's own governance work</span>
+          <h4>No single vendor covers this</h4>
+          <ul>
+            <li><b>Approval policy</b> and vendor risk review for AI tools.</li>
+            <li><b>Employee use</b> of AI inside Microsoft 365 and other SaaS tools.</li>
+            <li><b>Usage, cost, and effectiveness reporting</b> across vendors.</li>
+            <li><b>Acceptable-use rules</b> and model evaluation criteria.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="limit"><b>To be clear:</b> Salesforce controls apply to AI running on, or connected through, Salesforce. We are not suggesting Salesforce provides one permission model or one audit trail across every third-party AI tool. Those tools keep their own controls, and Ziosk's governance framework has to span them.</div>
+
+      <h3 class="sub" style="font-size:26px">Opportunity B. AI-assisted restaurant operations and support.<span class="hyp">Hypothesis</span></h3>
+      <p class="lede" style="margin-top:12px">Ziosk supports restaurant operators and their teams, not the millions of diners who use the tablets each week. The idea: let approved troubleshooting knowledge help staff resolve common issues, and route complex incidents into the Jira-centered support workflow you already have. Support volume, resolution rates, and cost impact are unknown, and we would not assume them.</p>
+      <div class="bgrid">
+        <div>
+          <h3>What we would want to learn first</h3>
+          <ul>
+            <li>Which restaurant issues recur most, and who handles them today.</li>
+            <li>Whether the knowledge needed to resolve them is documented and current.</li>
+            <li>How a handoff into Jira Service Management would need to work.</li>
+            <li>What “good” looks like to Ziosk operations leadership.</li>
+          </ul>
+        </div>
+        <div class="story">
+          <span class="label">A comparison worth studying · OpenTable</span>
+          <h4>A restaurant-facing support agent, built on real conversations.</h4>
+          <p>OpenTable also supports restaurants. It started with a restaurant-facing Agentforce agent and reported a 40% improvement in resolution rate versus its previous tool. Salesforce also reports an estimated 70% of Tier 1 restaurant support cases deflected and $2M saved annually.</p>
+          <p>Its published lessons are instructive: it used real chat transcripts to choose use cases, tightened its knowledge articles, and had the agent open a full-context case when a person was needed.</p>
+          <p class="caveat">OpenTable's volume, tools, and knowledge base differ from Ziosk's. We don't expect Ziosk to match its results. Salesforce also acquired Fin, a packaged support agent it describes as working with existing help desks, with a reported 76% average resolution rate across its customers. Whether either approach fits Ziosk is what discovery would test.</p>
+        </div>
+      </div>
+      <p class="note" style="margin-top:28px">Partner-led sales assistance and device-health intelligence are possible later conversations. They are not part of this one.</p>
+    </div>
+  </section>
+
+  <!-- 5 COMPLEMENT -->
+  <section aria-labelledby="h-stack">
+    <p class="label">How Salesforce could complement Ziosk's stack</p>
+    <h2 id="h-stack" style="margin-top:12px">Your systems stay. Any AI capability is an option to validate.</h2>
+    <div class="stack">
+      <div class="layer"><span class="label">Guests and staff</span><div class="chips"><span class="chip">Tabletop tablet</span><span class="chip">Server tablet</span><span class="chip">Pay at the table</span></div></div>
+      <div class="layer keep"><span class="label">Ziosk platform<span class="sm">Stays as is</span></span><div class="chips"><span class="chip">Ziosk product and payments integrations</span><span class="chip">POS partners: Aloha, Toast</span></div></div>
+      <div class="layer keep"><span class="label">Existing systems<span class="sm">Stay as is</span></span><div class="chips"><span class="chip">HubSpot (sales CRM)</span><span class="chip">Jira + Jira Service Management (engineering and support)</span><span class="chip">Microsoft 365 + Teams</span></div></div>
+      <div class="layer opt"><span class="label">Possible Salesforce AI capabilities<span class="sm">Optional · subject to technical validation</span></span><div class="chips"><span class="chip">Trust Layer controls</span><span class="chip">Support agent (Fin or Agentforce)</span><span class="chip">Agent governance (MuleSoft Agent Fabric)</span></div></div>
+    </div>
+    <p class="legend">SOLID = in place today. DASHED = an option to explore, not a recommendation.</p>
+
+    <div class="bgrid">
+      <div class="story">
+        <span class="label">Historical customer story · Toast</span>
+        <h4>The POS partner Bryan named, on Salesforce in 2019.</h4>
+        <p>In a 2019 Salesforce release, Toast described running its sales and service interactions on Salesforce as it scaled, including quoting, mobile install work, and a customer support hub. It cited 148% revenue growth in 2018 as the reason it outgrew spreadsheets.</p>
+        <p class="caveat">This is a six-year-old public story. We have not verified how Toast uses Salesforce today. It illustrates that a fast-growing restaurant-technology company needed systems built for scale, and Ziosk can draw its own conclusions.</p>
+      </div>
+      <div class="not">
+        <b>What we are not proposing.</b>
+        <p style="margin-top:8px">A new CRM. Replacing HubSpot, which your sales team recommitted to in May. Replacing Jira Service Management. Changing how Microsoft 365 and Teams are used. We also heard that Ziosk's remaining Salesforce application has been replaced and will likely be retired; this brief stands apart from that.</p>
+        <p style="margin-top:12px">Salesforce is also working with Microsoft on Copilot and Teams integrations, announced Nov 17, 2026. They focus on Salesforce data and sales workflows, so their relevance to Ziosk is unproven.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 NEXT CONVERSATION -->
+  <section style="padding-top:0" aria-labelledby="h-next">
+    <p class="label">A practical next conversation</p>
+    <h2 id="h-next" style="margin-top:12px">Four steps. Each one is a decision, not a commitment.</h2>
+    <div class="steps">
+      <div class="step"><div class="d">Step 1</div><h3>Strategic alignment</h3><p>Review Ziosk's 2027 AI priorities with the right business and technology leaders.</p></div>
+      <div class="step"><div class="d">Step 2</div><h3>Focused discovery</h3><p>Identify one high-value workflow. Understand the current architecture, risks, and operating metrics.</p></div>
+      <div class="step"><div class="d">Step 3</div><h3>Technical validation</h3><p>Determine whether Salesforce offers a viable fit that complements what Ziosk runs today.</p></div>
+      <div class="step"><div class="d">Step 4</div><h3>Proof of value, if justified</h3><p>Agree on scope, timeline, ownership, and measurable outcomes before anything is built.</p></div>
+    </div>
+
+    <div class="cta">
+      <h2>Explore what governed AI could unlock for Ziosk's next phase of growth.</h2>
+      <p class="s">Let's bring together the leaders responsible for AI strategy, technology governance, and restaurant operations to identify where AI could create measurable value without disrupting the systems Ziosk has already invested in.</p>
+      <span class="btn">Schedule a 30-minute AI strategy session</span>
+      <p class="coord">Bryan remains our coordination point. His role is to bring the right owners to the table, and we would welcome his guidance on who should join. To schedule, reply to the message that shared this page.</p>
+    </div>
+
+    <div class="people">
+      <div><b>Jameson</b><span>Account Executive, Salesforce. Your point of contact.</span></div>
+      <div><b>Matt Giuffre</b><span>Solution Engineer, Salesforce. Product and architecture questions.</span></div>
+      <div><b>Bryan Campbell</b><span>IT Director, Ziosk. Coordinates vendors and brings in business owners.</span></div>
+    </div>
+
+    <details>
+      <summary>Sources and how each claim was checked</summary>
+      <ul>
+        <li><b>Fin acquisition, 30,000+ customers, 76% average resolution rate.</b> Stated by Salesforce on completing the acquisition, Sep 10, 2026. The 76% is Salesforce's own figure. <a href="https://www.salesforce.com/news/press-releases/2026/09/10/salesforce-completes-acquisition-of-fin/">Salesforce press release</a></li>
+        <li><b>OpenTable: 70% of Tier 1 restaurant cases deflected (estimated), $2M saved annually.</b> Stated by Salesforce, Feb 17, 2026. <a href="https://www.salesforce.com/blog/frontier/">Salesforce blog</a></li>
+        <li><b>OpenTable: 40% improvement in resolution rate versus prior tool, and the lessons described.</b> <a href="https://www.salesforce.com/customer-stories/opentable-agentforce-implementation/">Salesforce customer story</a></li>
+        <li><b>Toast.</b> Historical, from Salesforce's Apr 23, 2019 release. Current product usage not verified. <a href="https://www.salesforce.com/news/press-releases/2019/04/23/toast-is-cooking-with-salesforce-and-helping-restaurants-succeed/">Salesforce press release</a></li>
+        <li><b>Claude in Agentforce, inside the Salesforce trust boundary via Amazon Bedrock; available to select customers.</b> As of Oct 14, 2025. Applies to Agentforce, not to other Claude use. <a href="https://www.salesforce.com/news/press-releases/2025/10/14/anthropic-regulated-industries-partnership-expansion-announcement/">Salesforce and Anthropic announcement</a></li>
+        <li><b>Einstein Trust Layer.</b> <a href="https://help.salesforce.com/s/articleView?language=en_US&amp;id=sf.generative_ai_trust_layer.htm&amp;type=5">Salesforce Help</a>. Exact masking and logging coverage varies by feature and should be confirmed in current documentation.</li>
+        <li><b>MuleSoft Agent Fabric.</b> Capabilities as described by MuleSoft. <a href="https://www.mulesoft.com/ai/agent-fabric">MuleSoft</a></li>
+        <li><b>Copilot and Teams integrations.</b> Announced Nov 17, 2026; Copilot plugin in public preview, Teams app in pilot. <a href="https://www.salesforce.com/news/stories/copilotforce-announcement/">Salesforce announcement</a></li>
+        <li><b>Ziosk context.</b> Bryan Campbell, Nov 20, 2026 call. Ziosk's description of its own platform: <a href="https://www.ziosk.com/">ziosk.com</a>.</li>
+      </ul>
+    </details>
+  </section>
+
+  <footer>
+    <p>Prepared by Salesforce for Ziosk leadership. Customer and product figures are reported by Salesforce and have not been independently audited. Capabilities described may not be generally available or suited to Ziosk's environment; each would need technical validation.</p>
+    <p>For discussion only. Not a quote, proposal, or commitment.</p>
+  </footer>
+</div>
+</body>
+</html>
